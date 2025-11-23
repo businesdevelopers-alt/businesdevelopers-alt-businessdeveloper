@@ -7,7 +7,7 @@ import { MY_BUSINESS_GENOME } from '../constants';
 
 interface NetworkIntelligenceProps {
   businesses: Business[];
-  userGenome: BusinessGenome; // Now required prop from parent
+  userGenome: BusinessGenome;
 }
 
 const NetworkIntelligence: React.FC<NetworkIntelligenceProps> = ({ businesses, userGenome }) => {
@@ -65,11 +65,11 @@ const NetworkIntelligence: React.FC<NetworkIntelligenceProps> = ({ businesses, u
     } finally {
         setLoading(false);
     }
-  }, [businesses, language, searchQuery, selectedIndustry, selectedSize, userGenome]); // Re-fetch when userGenome changes
+  }, [businesses, language, searchQuery, selectedIndustry, selectedSize, userGenome]);
 
   useEffect(() => {
     fetchMatches();
-  }, [userGenome]); // Trigger on genome change or initial load (via fetchMatches dep)
+  }, [fetchMatches]); 
 
   const getBusinessById = (id: string) => businesses.find(b => b.id === id);
 
@@ -79,22 +79,18 @@ const NetworkIntelligence: React.FC<NetworkIntelligenceProps> = ({ businesses, u
       if (sortOrder === 'score') {
           result.sort((a, b) => b.score - a.score);
       }
-      // Default preserves original order from AI (relevance)
       return result;
   }, [matches, sortOrder]);
 
   const getFactorIcon = (factor: string) => {
     const f = factor.toLowerCase();
     if (f.includes('industry') || f.includes('sector')) return (
-       // Building Icon
        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
     );
     if (f.includes('service') || f.includes('match') || f.includes('offer') || f.includes('need') || f.includes('synergy')) return (
-       // Handshake/Puzzle Icon
        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
     );
     if (f.includes('strategic') || f.includes('fit') || f.includes('market') || f.includes('size')) return (
-       // Chart/Target Icon
        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
     );
     return <div className="w-1.5 h-1.5 rounded-full bg-current"></div>;
@@ -224,35 +220,43 @@ const NetworkIntelligence: React.FC<NetworkIntelligenceProps> = ({ businesses, u
 
       <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
          
-         {/* Matches Grid (TOP 3 from Sorted List) */}
          <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">{t('highValueMatch')}</h3>
          
          {loading ? (
-            <div className="flex flex-col items-center justify-center h-64">
-               <div className="w-12 h-12 border-2 border-brand-surface border-t-brand-primary rounded-full animate-spin mb-4"></div>
-               <p className="text-brand-secondary animate-pulse">{t('generatingMatches')}</p>
+            <div className="flex flex-col items-center justify-center h-96">
+               <div className="relative w-24 h-24 mb-6">
+                  <div className="absolute inset-0 border-4 border-slate-100 rounded-full"></div>
+                  <div className="absolute inset-0 border-4 border-brand-primary border-t-transparent rounded-full animate-spin"></div>
+                  <div className="absolute inset-4 bg-brand-surface rounded-full flex items-center justify-center">
+                     <span className="text-2xl animate-pulse">🧠</span>
+                  </div>
+               </div>
+               <h3 className="text-lg font-bold text-brand-primary mb-2">{t('generatingMatches')}</h3>
+               <p className="text-slate-400 text-sm">Analyzing Business Genome Compatibility...</p>
             </div>
          ) : sortedMatches.length === 0 ? (
-            <div className="bg-white rounded-2xl p-12 text-center border border-slate-100">
-                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-400 text-2xl">🔍</div>
-                <h3 className="text-lg font-bold text-slate-600 mb-2">{t('noResults')}</h3>
-                <p className="text-slate-400 text-sm max-w-xs mx-auto">{t('tryRefreshing')}</p>
+            <div className="bg-white rounded-2xl p-12 text-center border border-slate-100 flex flex-col items-center">
+                <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-6 text-slate-400 text-4xl shadow-inner">🔍</div>
+                <h3 className="text-xl font-bold text-slate-700 mb-2">{t('noResults')}</h3>
+                <p className="text-slate-500 text-sm max-w-sm mx-auto mb-6">{t('tryRefreshing')}</p>
+                <button onClick={fetchMatches} className="px-6 py-2.5 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors text-sm">
+                   Reset & Search Again
+                </button>
             </div>
          ) : (
             <>
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mb-12">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mb-12 animate-slide-up">
                 {sortedMatches.slice(0, 3).map((match, idx) => {
                     const business = getBusinessById(match.companyId);
                     if (!business) return null;
 
-                    const isHighPriority = match.score > 80;
+                    const isHighPriority = match.score >= 80;
 
                     return (
                         <div key={idx} className={`group bg-white rounded-2xl p-6 shadow-card hover:shadow-card-hover border transition-all duration-300 hover:-translate-y-1 relative overflow-hidden flex flex-col ${isHighPriority ? 'border-brand-gold ring-1 ring-brand-gold/20' : 'border-slate-100'}`}>
                             {isHighPriority && (
                                 <div className="absolute top-0 left-0 w-full h-1 bg-brand-gold"></div>
                              )}
-                            {/* Decorative DNA Background */}
                             <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-50 to-transparent opacity-50 rounded-bl-full -mr-8 -mt-8 pointer-events-none"></div>
 
                             <div className="relative z-10 flex-1 flex flex-col">
@@ -276,7 +280,6 @@ const NetworkIntelligence: React.FC<NetworkIntelligenceProps> = ({ businesses, u
                                 </div>
                             </div>
 
-                            {/* AI Insight */}
                             <div className="bg-brand-surface rounded-xl p-4 mb-6 border border-slate-100 flex-1">
                                 <div className="flex items-center gap-2 mb-2">
                                     <svg className={`w-4 h-4 ${isHighPriority ? 'text-brand-gold' : 'text-brand-primary'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
@@ -284,10 +287,8 @@ const NetworkIntelligence: React.FC<NetworkIntelligenceProps> = ({ businesses, u
                                 </div>
                                 <p className="text-sm text-text-sub leading-relaxed font-medium mb-4">{match.matchReason}</p>
                                 
-                                {/* Detailed Analysis Points */}
                                 {match.analysisPoints && match.analysisPoints.length > 0 && (
                                     <div className="space-y-2 mt-4 pt-4 border-t border-slate-200/60">
-                                        {/* Visual header for data analysis */}
                                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Data-Driven Compatibility</p>
                                         {match.analysisPoints.map((point, i) => (
                                         <div 
@@ -323,7 +324,6 @@ const NetworkIntelligence: React.FC<NetworkIntelligenceProps> = ({ businesses, u
                                 )}
                             </div>
 
-                             {/* Shared Interests Grouping - ENHANCED VISUALS */}
                              {match.sharedInterests && match.sharedInterests.length > 0 && (
                                 <div className={`mb-6 rounded-xl p-4 border border-dashed ${isHighPriority ? 'bg-yellow-50/50 border-brand-gold/40' : 'bg-slate-50 border-slate-200'}`}>
                                     <div className="flex items-center gap-2 mb-3">
@@ -358,9 +358,8 @@ const NetworkIntelligence: React.FC<NetworkIntelligenceProps> = ({ businesses, u
                 })}
                 </div>
 
-                {/* Recommended Connections Carousel (Remaining Matches from Sorted List) */}
                 {sortedMatches.length > 3 && (
-                    <div className="border-t border-slate-100 pt-8">
+                    <div className="border-t border-slate-100 pt-8 animate-slide-up" style={{ animationDelay: '0.2s' }}>
                         <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
                             <span>{t('recommendedConnections')}</span>
                             <div className="h-px flex-1 bg-slate-100"></div>
@@ -371,7 +370,6 @@ const NetworkIntelligence: React.FC<NetworkIntelligenceProps> = ({ businesses, u
                                 const business = getBusinessById(match.companyId);
                                 if (!business) return null;
                                 
-                                // Extract service-related reason from analysis points if available
                                 const servicePoint = match.analysisPoints?.find(p => 
                                     p.factor.toLowerCase().includes('service') || 
                                     p.factor.toLowerCase().includes('need') || 
@@ -454,7 +452,7 @@ const NetworkIntelligence: React.FC<NetworkIntelligenceProps> = ({ businesses, u
                      <div className="flex-1 bg-white border border-slate-200 p-4 rounded-xl text-center shadow-sm">
                         <div className="w-12 h-12 bg-slate-100 rounded-full mx-auto mb-2 flex items-center justify-center overflow-hidden">
                            {selectedMatch.business.logoUrl ? (
-                                <img src={selectedMatch.business.logoUrl} className="w-full h-full object-cover" />
+                                <img src={selectedMatch.business.logoUrl} className="w-full h-full object-cover" alt="" />
                            ) : (
                                 <span className="text-xs font-bold">LOGO</span>
                            )}

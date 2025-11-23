@@ -147,47 +147,42 @@ export const generateBusinessMatches = async (myProfile: BusinessGenome, availab
         }));
 
     const prompt = `
-      You are the 'Business Genome Matching Engine'. 
+      You are the "Business Genome Matching Engine" for a digital business district.
       
-      My Business Profile:
+      YOUR PROFILE (The User):
       ${JSON.stringify(myProfile)}
       
-      Candidate Ecosystem (Array of potential partners):
+      CANDIDATE ECOSYSTEM (Potential Partners):
       ${JSON.stringify(simplifiedCandidates)}
       
-      Task:
-      Analyze the compatibility between My Business and the Candidates.
+      TASK:
+      Analyze the compatibility between the "User" and the "Candidates" based on their Genome Profiles (Industry, Services Offered/Needed, Company Size, Collaboration Preferences).
       
-      Return the top 8 matches as a valid JSON array.
+      SCORING LOGIC:
+      - High Score (80-100): Direct Supply/Demand match (e.g., User needs Marketing, Candidate offers Marketing) OR highly complementary industries.
+      - Medium Score (60-79): Shared target markets or compatible company sizes for partnership.
+      - Low Score (<60): Little obvious synergy.
       
-      Constraints:
-      - "companyId" MUST match the exact ID from the candidate list.
-      - "score" should be an integer between 0 and 100.
-      - "matchReason" should be a concise summary (max 20 words) stating the primary synergy.
-      - "collaborationOpportunity" should be a one-sentence actionable suggestion.
-      
-      - "analysisPoints" must be an array of exactly 3 objects describing the match in detail:
-         1. factor: "Industry Sector"
-            description: Compare specific sectors. E.g. "Your '${myProfile.industrySector || 'Sector'}' aligns with their 'Real Estate'."
-         2. factor: "Services Synergy"
-            description: Identify specific overlaps between needs and offers. E.g. "Your need for '${myProfile.servicesNeeded?.[0] || 'Services'}' is met by their offer."
-         3. factor: "Strategic Fit"
-            description: Compare company size and markets. E.g. "Both target '${myProfile.targetMarkets?.[0] || 'Market'}' and are '${myProfile.companySize}' size."
+      REQUIREMENTS:
+      1. Return the TOP 6 matches.
+      2. "matchReason" must be specific to the services/industries involved.
+      3. "collaborationOpportunity" must be a concrete project idea (e.g., "Joint venture to enter the Saudi market", "Service exchange agreement").
+      4. "analysisPoints" must explain the score using exactly 3 factors: "Industry Sector", "Services Synergy", and "Strategic Fit".
       
       Output Language: ${language === 'ar' ? 'Arabic' : language === 'es' ? 'Spanish' : 'English'}
 
-      Output format (JSON only):
+      RETURN STRICT JSON ARRAY:
       [
         {
-          "companyId": "id",
-          "score": 85,
-          "matchReason": "...",
-          "sharedInterests": ["Tag1", "Tag2"],
-          "collaborationOpportunity": "...",
+          "companyId": "string (must match candidate ID)",
+          "score": number (0-100),
+          "matchReason": "string (short summary)",
+          "sharedInterests": ["string", "string"],
+          "collaborationOpportunity": "string",
           "analysisPoints": [
-             { "factor": "Industry Sector", "description": "..." },
-             { "factor": "Services Synergy", "description": "..." },
-             { "factor": "Strategic Fit", "description": "..." }
+             { "factor": "Industry Sector", "description": "string" },
+             { "factor": "Services Synergy", "description": "string" },
+             { "factor": "Strategic Fit", "description": "string" }
           ]
         }
       ]
@@ -202,9 +197,8 @@ export const generateBusinessMatches = async (myProfile: BusinessGenome, availab
     });
 
     const text = response.text || "[]";
-    // Robust JSON extraction
     const jsonMatch = text.match(/\[[\s\S]*\]/);
-    const cleanText = jsonMatch ? jsonMatch[0] : text.replace(/```json/g, '').replace(/```/g, '').trim();
+    const cleanText = jsonMatch ? jsonMatch[0] : "[]";
     
     return JSON.parse(cleanText) as MatchResult[];
 
