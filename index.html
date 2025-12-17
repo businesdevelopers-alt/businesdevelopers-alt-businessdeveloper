@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Business Developers | Industrial Digital District</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class', 
+        theme: {
+          extend: {
+            colors: {
+              'brand-dark': '#1A1D22', // Industrial Graphite (Headings, Dark BGs)
+              'brand-bg': '#F2F3F5', // Steel Gray (General BG)
+              'brand-surface': '#FFFFFF', // Pure White (Cards)
+              'brand-primary': '#2D89E5', // Tech Blue
+              'brand-accent': '#F7C600', // Signal Yellow
+              'text-main': '#1A1D22', // Graphite text
+              'text-sub': '#64748B', // Muted text
+              'brand-secondary': '#64748B', 
+            },
+            boxShadow: {
+              'soft': '0 2px 8px rgba(26, 29, 34, 0.04)',
+              'card': '0 4px 12px rgba(26, 29, 34, 0.06)',
+              'elevated': '0 12px 24px -4px rgba(26, 29, 34, 0.1)',
+              'glow': '0 0 20px rgba(45, 137, 229, 0.15)',
+            },
+            fontFamily: {
+              sans: ['IBM Plex Sans Arabic', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+              mono: ['JetBrains Mono', 'monospace'],
+              heading: ['IBM Plex Sans Arabic', 'sans-serif'],
+            },
+            borderRadius: {
+              'xl': '8px', 
+              '2xl': '12px',
+              '3xl': '16px', 
+            },
+            animation: {
+              'fade-in': 'fadeIn 0.5s ease-out forwards',
+              'slide-up': 'slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+              'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            },
+            keyframes: {
+              fadeIn: {
+                '0%': { opacity: '0' },
+                '100%': { opacity: '1' },
+              },
+              slideUp: {
+                '0%': { transform: 'translateY(10px)', opacity: '0' },
+                '100%': { transform: 'translateY(0)', opacity: '1' },
+              }
+            }
+          }
+        }
+      }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        scroll-behavior: smooth;
+      }
+      body {
+        font-family: 'IBM Plex Sans Arabic', sans-serif;
+        background-color: #F2F3F5;
+        color: #1A1D22;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        overflow-x: hidden;
+      }
+      
+      /* Technical Grid Pattern */
+      .bg-grid-tech {
+        background-size: 40px 40px;
+        background-image: linear-gradient(to right, rgba(26, 29, 34, 0.05) 1px, transparent 1px),
+                          linear-gradient(to bottom, rgba(26, 29, 34, 0.05) 1px, transparent 1px);
+      }
+      
+      .bg-grid-tech-dark {
+        background-size: 40px 40px;
+        background-image: linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+                          linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+      }
+
+      /* Scrollbar */
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #F2F3F5; 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #CBD5E1; 
+        border-radius: 3px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #94A3B8; 
+      }
+
+      .glass-panel {
+        background: rgba(255, 255, 255, 0.95);
+        border: 1px solid rgba(26, 29, 34, 0.05);
+        backdrop-filter: blur(8px);
+      }
+      
+      .preserve-3d {
+        transform-style: preserve-3d;
+      }
+      .backface-hidden {
+        backface-visibility: hidden;
+      }
+      
+      .mask-fade-right {
+        -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%);
+        mask-image: linear-gradient(to right, black 85%, transparent 100%);
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/"
+  }
+}
+</script>
+</head>
+  <body class="bg-brand-bg text-text-main transition-colors duration-300 selection:bg-brand-primary selection:text-white">
+    <div id="root"></div>
+  </body>
+</html>

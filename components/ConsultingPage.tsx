@@ -1,0 +1,318 @@
+
+import React, { useState, useMemo } from 'react';
+import { useLanguage } from '../contexts/LanguageContext';
+import { recommendConsultingService } from '../services/geminiService';
+
+const ConsultingPage: React.FC = () => {
+  const { t, language } = useLanguage();
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [activeFilter, setActiveFilter] = useState<string>('all');
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    company: '',
+    email: '',
+    phone: '',
+    details: '',
+    budget: ''
+  });
+
+  // AI Recommendation State
+  const [aiQuery, setAiQuery] = useState('');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [aiReasoning, setAiReasoning] = useState('');
+
+  // Filter Options
+  const filters = [
+    { id: 'all', label: 'All Services' },
+    { id: 'growth', label: 'Growth & Strategy' },
+    { id: 'technical', label: 'Technical & Digital' },
+    { id: 'hr', label: 'HR & Management' },
+    { id: 'legal', label: 'Legal & Compliance' }
+  ];
+
+  const categories = [
+    { id: 'cons_tech', icon: 'tech', color: 'text-blue-400', border: 'hover:border-blue-500', type: 'technical' },
+    { id: 'cons_marketing', icon: 'market', color: 'text-purple-400', border: 'hover:border-purple-500', type: 'growth' },
+    { id: 'cons_training', icon: 'train', color: 'text-green-400', border: 'hover:border-green-500', type: 'hr' },
+    { id: 'cons_recruitment', icon: 'recruit', color: 'text-orange-400', border: 'hover:border-orange-500', type: 'hr' },
+    { id: 'cons_gov', icon: 'gov', color: 'text-slate-400', border: 'hover:border-slate-500', type: 'legal' },
+  ];
+
+  const filteredCategories = useMemo(() => {
+    if (activeFilter === 'all') return categories;
+    return categories.filter(cat => cat.type === activeFilter);
+  }, [activeFilter]);
+
+  const getIcon = (type: string) => {
+    switch(type) {
+      case 'tech': return <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />;
+      case 'market': return <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />;
+      case 'train': return <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />;
+      case 'recruit': return <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />;
+      case 'gov': return <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />;
+      default: return <path d="" />;
+    }
+  };
+
+  const handleAiRecommendation = async () => {
+    if (!aiQuery.trim()) return;
+    setIsAnalyzing(true);
+    setAiReasoning('');
+    try {
+      const result = await recommendConsultingService(aiQuery, language);
+      if (result.recommendedId) {
+        setSelectedCategory(result.recommendedId);
+        setAiReasoning(result.reasoning);
+        setActiveFilter('all'); // Ensure the selected category is visible
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitted(true);
+    setTimeout(() => {
+        setIsSubmitted(false);
+        setFormData({ name: '', company: '', email: '', phone: '', details: '', budget: '' });
+        setSelectedCategory(null);
+    }, 3000);
+  };
+
+  return (
+    <div className="min-h-screen bg-brand-bg animate-fade-in">
+      
+      {/* Hero Section: Solid Dark Blue/Black */}
+      <div className="bg-brand-surface border-b border-white/5 pt-16 pb-24 relative overflow-hidden">
+         <div className="max-w-4xl mx-auto px-6 text-center relative z-10">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-brand-primary/10 border border-brand-primary/20 text-brand-primary text-xs font-bold uppercase tracking-widest mb-6">
+                <div className="w-2 h-2 rounded-full bg-brand-primary animate-pulse"></div>
+                Premium Services
+             </div>
+            <h1 className="text-4xl md:text-6xl font-heading font-bold mb-6 text-white">{t('consultingTitle')}</h1>
+            <p className="text-xl text-text-sub max-w-2xl mx-auto font-light leading-relaxed">
+               {t('consultingSubtitle')}
+            </p>
+         </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-6 -mt-16 relative z-20 pb-20">
+         <div className="bg-brand-surface rounded-[32px] shadow-elevated p-8 md:p-12 border border-white/10">
+            
+            {/* Steps / Layout */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+               
+               {/* Left: Category Selection */}
+               <div className="lg:col-span-5 flex flex-col h-full">
+                  <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+                     <span className="flex items-center justify-center w-6 h-6 rounded-full bg-brand-primary text-white text-xs">1</span>
+                     {t('selectConsultingType')}
+                  </h3>
+
+                  {/* AI Assistant Block */}
+                  <div className="mb-8 bg-brand-bg p-6 rounded-2xl border border-white/5 relative overflow-hidden">
+                        
+                        <div className="flex items-center gap-2 mb-3">
+                            <div className="w-8 h-8 rounded-lg bg-brand-primary flex items-center justify-center text-white shadow-sm">
+                                ✨
+                            </div>
+                            <h4 className="font-bold text-white text-sm">{t('aiRecommendation')}</h4>
+                        </div>
+                        
+                        <p className="text-xs text-slate-400 mb-4 leading-relaxed">
+                            {t('aiConsultingDesc')}
+                        </p>
+
+                        <div className="relative">
+                            <textarea
+                                value={aiQuery}
+                                onChange={(e) => setAiQuery(e.target.value)}
+                                placeholder={t('describeNeeds')}
+                                className="w-full p-3 rounded-xl border border-white/10 text-sm focus:ring-2 focus:ring-brand-primary/40 outline-none bg-brand-surface min-h-[80px] resize-none text-white placeholder:text-slate-500"
+                            />
+                            <button 
+                                onClick={handleAiRecommendation}
+                                disabled={isAnalyzing || !aiQuery.trim()}
+                                className="absolute bottom-2 right-2 p-2 bg-brand-primary text-white rounded-lg hover:brightness-110 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                            >
+                                {isAnalyzing ? (
+                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                ) : (
+                                    <svg className="w-4 h-4 rtl:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                                )}
+                            </button>
+                        </div>
+
+                        {aiReasoning && (
+                            <div className="mt-4 p-3 bg-brand-surface rounded-xl border border-brand-primary/30 text-xs text-blue-200 leading-relaxed animate-fade-in flex gap-2 items-start">
+                                <span className="text-lg">💡</span>
+                                <span>{aiReasoning}</span>
+                            </div>
+                        )}
+                  </div>
+
+                  {/* Filter Tabs */}
+                  <div className="flex flex-wrap gap-2 mb-6">
+                    {filters.map(filter => (
+                      <button
+                        key={filter.id}
+                        onClick={() => setActiveFilter(filter.id)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                          activeFilter === filter.id 
+                            ? 'bg-brand-primary text-white border-brand-primary' 
+                            : 'bg-transparent text-slate-400 border-white/10 hover:border-white/20'
+                        }`}
+                      >
+                        {filter.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="space-y-4 flex-1 overflow-y-auto max-h-[600px] pr-2 custom-scrollbar">
+                     {filteredCategories.length === 0 ? (
+                       <div className="text-center py-8 text-slate-500 text-sm">No services match this filter.</div>
+                     ) : (
+                       filteredCategories.map((cat) => (
+                          <button
+                             key={cat.id}
+                             onClick={() => setSelectedCategory(cat.id)}
+                             className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-all duration-200 group text-start animate-slide-up ${
+                                selectedCategory === cat.id 
+                                ? 'border-brand-primary bg-brand-primary/10 shadow-sm' 
+                                : 'border-white/5 bg-brand-bg hover:border-white/20'
+                             }`}
+                          >
+                             <div className={`w-12 h-12 rounded-lg flex items-center justify-center shrink-0 transition-colors bg-brand-surface ${cat.color} ${selectedCategory === cat.id ? 'ring-2 ring-offset-2 ring-offset-brand-surface ring-brand-primary/40' : ''}`}>
+                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                   {getIcon(cat.icon)}
+                                </svg>
+                             </div>
+                             <div>
+                                <h4 className={`font-bold text-sm ${selectedCategory === cat.id ? 'text-brand-primary' : 'text-white'}`}>
+                                   {t(cat.id)}
+                                </h4>
+                                <p className="text-xs text-slate-500 mt-1">{t(cat.id + '_desc')}</p>
+                             </div>
+                             {selectedCategory === cat.id && (
+                                <div className="ml-auto text-brand-primary">
+                                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                                </div>
+                             )}
+                          </button>
+                       ))
+                     )}
+                  </div>
+               </div>
+
+               {/* Right: Request Form */}
+               <div className="lg:col-span-7 border-t lg:border-t-0 lg:border-l lg:border-white/10 pt-12 lg:pt-0 lg:pl-12 rtl:lg:pl-0 rtl:lg:pr-12">
+                  <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+                     <span className="flex items-center justify-center w-6 h-6 rounded-full bg-brand-primary text-white text-xs">2</span>
+                     {t('requestConsultation')}
+                  </h3>
+
+                  {isSubmitted ? (
+                     <div className="bg-green-500/5 border border-green-500/20 rounded-2xl p-8 text-center h-full flex flex-col items-center justify-center animate-scale-in">
+                        <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center text-4xl mb-6 text-green-500">
+                           ✅
+                        </div>
+                        <h3 className="text-2xl font-bold text-white mb-2">{t('requestSentSuccess')}</h3>
+                        <p className="text-slate-400 max-w-sm mx-auto">{t('weWillContact')}</p>
+                        <button onClick={() => setIsSubmitted(false)} className="mt-8 text-sm font-bold text-green-500 hover:underline">Send another request</button>
+                     </div>
+                  ) : (
+                     <form onSubmit={handleSubmit} className={`space-y-6 transition-opacity duration-300 ${!selectedCategory ? 'opacity-50 pointer-events-none blur-[1px]' : 'opacity-100'}`}>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                           <div className="space-y-2">
+                              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">{t('name')}</label>
+                              <input 
+                                 type="text" 
+                                 required
+                                 value={formData.name}
+                                 onChange={e => setFormData({...formData, name: e.target.value})}
+                                 className="w-full px-4 py-3 rounded-xl bg-brand-bg border border-white/10 focus:ring-2 focus:ring-brand-primary/40 focus:border-brand-primary outline-none transition-all text-white"
+                              />
+                           </div>
+                           <div className="space-y-2">
+                              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">{t('companyName')}</label>
+                              <input 
+                                 type="text" 
+                                 required
+                                 value={formData.company}
+                                 onChange={e => setFormData({...formData, company: e.target.value})}
+                                 className="w-full px-4 py-3 rounded-xl bg-brand-bg border border-white/10 focus:ring-2 focus:ring-brand-primary/40 focus:border-brand-primary outline-none transition-all text-white"
+                              />
+                           </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                           <div className="space-y-2">
+                              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">{t('email')}</label>
+                              <input 
+                                 type="email" 
+                                 required
+                                 value={formData.email}
+                                 onChange={e => setFormData({...formData, email: e.target.value})}
+                                 className="w-full px-4 py-3 rounded-xl bg-brand-bg border border-white/10 focus:ring-2 focus:ring-brand-primary/40 focus:border-brand-primary outline-none transition-all text-white"
+                              />
+                           </div>
+                           <div className="space-y-2">
+                              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">{t('phone')}</label>
+                              <input 
+                                 type="tel" 
+                                 required
+                                 value={formData.phone}
+                                 onChange={e => setFormData({...formData, phone: e.target.value})}
+                                 className="w-full px-4 py-3 rounded-xl bg-brand-bg border border-white/10 focus:ring-2 focus:ring-brand-primary/40 focus:border-brand-primary outline-none transition-all text-white"
+                              />
+                           </div>
+                        </div>
+
+                        <div className="space-y-2">
+                           <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">{t('projectDetails')}</label>
+                           <textarea 
+                              rows={4}
+                              required
+                              value={formData.details}
+                              onChange={e => setFormData({...formData, details: e.target.value})}
+                              className="w-full px-4 py-3 rounded-xl bg-brand-bg border border-white/10 focus:ring-2 focus:ring-brand-primary/40 focus:border-brand-primary outline-none transition-all resize-none text-white"
+                           />
+                        </div>
+
+                        <div className="space-y-2">
+                           <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">{t('budgetRange')}</label>
+                           <select 
+                              value={formData.budget}
+                              onChange={e => setFormData({...formData, budget: e.target.value})}
+                              className="w-full px-4 py-3 rounded-xl bg-brand-bg border border-white/10 focus:ring-2 focus:ring-brand-primary/40 focus:border-brand-primary outline-none transition-all text-white"
+                           >
+                              <option value="">Select Range</option>
+                              <option value="small">Less than 10,000 SAR</option>
+                              <option value="medium">10,000 - 50,000 SAR</option>
+                              <option value="large">50,000 - 200,000 SAR</option>
+                              <option value="enterprise">200,000+ SAR</option>
+                           </select>
+                        </div>
+
+                        <button 
+                           type="submit"
+                           disabled={!selectedCategory}
+                           className="w-full py-4 bg-brand-primary text-white font-bold rounded-xl shadow-lg hover:brightness-110 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                           {t('submitRequest')}
+                        </button>
+                     </form>
+                  )}
+               </div>
+            </div>
+         </div>
+      </div>
+    </div>
+  );
+};
+
+export default ConsultingPage;
