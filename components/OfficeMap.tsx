@@ -108,23 +108,27 @@ const BuildingBlock = React.memo(({ business, isHovered, isSelected, isFeatured,
       ? 'border-brand-primary shadow-2xl'
       : 'border-white/20';
 
-  const showBanner = (lod === 'high' || isSelected || isHovered) && business.isOccupied; 
-  const showDetails = lod === 'high' || isHovered;
+  // Details Visibility: High LOD shows text/logo. Medium shows solid block. Hover always shows detail.
+  const showContent = lod === 'high' || isHovered;
+  const showBanner = (showContent || isSelected) && business.isOccupied; 
   
   const faceClass = "absolute inset-0 backface-hidden transition-all duration-300";
 
   // --- Premium Texture & Facade Logic ---
   const { frontFacade, sideFacade, roofStyle } = useMemo(() => {
-    // If LOD is low, return simplified styles immediately
     const isOcc = business.isOccupied;
     
     // Building Base Color logic
     let wallBase = isOcc ? '#1E293B' : '#F1F5F9';
+    let wallGradient = '';
 
     if (isOcc) {
         if (mapMode === 'heatmap') {
+             // Smoothed Heatmap Gradient: Blue -> Teal -> Green -> Yellow -> Red
              const hue = Math.max(0, 240 - (heatmapIntensity * 240));
-             wallBase = `hsl(${hue}, 70%, 45%)`;
+             wallBase = `hsl(${hue}, 75%, 50%)`;
+             // Vertical gradient for "volume" heat effect
+             wallGradient = `linear-gradient(to bottom, hsl(${hue}, 85%, 60%) 0%, hsl(${hue}, 75%, 45%) 100%)`;
         } else if (mapMode === 'traffic') {
              const visitors = business.activeVisitors || 0;
              if (visitors > 40) wallBase = '#e11d48'; 
@@ -141,15 +145,30 @@ const BuildingBlock = React.memo(({ business, isHovered, isSelected, isFeatured,
         }
     }
 
-    // --- LOW LOD RENDERING (Performance Optimization) ---
-    if (lod === 'low') {
+    // --- LOW & MEDIUM LOD (Optimized) ---
+    // No gradients for windows to save performance on zoomed out views.
+    if (lod !== 'high') {
+        const bgImage = (mapMode === 'heatmap' && wallGradient) ? wallGradient : 'none';
         return {
-            frontFacade: { backgroundColor: wallBase, backgroundImage: 'none', boxShadow: 'none' },
-            sideFacade: { backgroundColor: wallBase, backgroundImage: 'none', filter: 'brightness(0.7)', boxShadow: 'none' },
+            frontFacade: { 
+                backgroundColor: wallBase, 
+                backgroundImage: bgImage, 
+                // Medium gets a subtle inset shadow for depth, Low gets nothing
+                boxShadow: lod === 'medium' ? 'inset 0 0 20px rgba(0,0,0,0.3)' : 'none',
+                transition: 'background-color 0.3s'
+            },
+            sideFacade: { 
+                backgroundColor: wallBase, 
+                backgroundImage: bgImage, 
+                filter: 'brightness(0.7)', 
+                boxShadow: 'none',
+                transition: 'background-color 0.3s'
+            },
             roofStyle: { 
                 backgroundColor: isOcc ? (mapMode === 'standard' ? '#0F172A' : wallBase) : '#FFFFFF',
                 border: isOcc ? 'none' : '1px dashed #cbd5e1',
-                backgroundImage: 'none'
+                backgroundImage: 'none',
+                transition: 'background-color 0.3s'
             }
         };
     }
@@ -166,17 +185,26 @@ const BuildingBlock = React.memo(({ business, isHovered, isSelected, isFeatured,
       linear-gradient(to right, transparent 5%, rgba(255,255,255,0.05) 5%, rgba(255,255,255,0.05) 95%, transparent 95%)
     `;
 
+    // Combine window pattern with heatmap gradient if active
+    const finalBgImage = (mapMode === 'heatmap' && wallGradient) 
+        ? `${windowPattern}, ${wallGradient}` 
+        : windowPattern;
+        
+    const finalBgSize = (mapMode === 'heatmap' && wallGradient)
+        ? '100% 40px, 20px 100%, 100% 100%'
+        : '100% 40px, 20px 100%';
+
     const front = {
       backgroundColor: wallBase,
-      backgroundImage: windowPattern,
-      backgroundSize: '100% 40px, 20px 100%',
+      backgroundImage: finalBgImage,
+      backgroundSize: finalBgSize,
       boxShadow: 'inset 0 0 20px rgba(0,0,0,0.5)'
     };
     
     const side = {
       backgroundColor: wallBase,
-      backgroundImage: windowPattern,
-      backgroundSize: '100% 40px, 20px 100%',
+      backgroundImage: finalBgImage,
+      backgroundSize: finalBgSize,
       filter: 'brightness(0.85)',
       boxShadow: 'inset 0 0 20px rgba(0,0,0,0.5)'
     };
@@ -196,9 +224,9 @@ const BuildingBlock = React.memo(({ business, isHovered, isSelected, isFeatured,
       onMouseLeave={() => onHover(null)}
       className={`relative w-full h-full group pointer-events-auto cursor-pointer preserve-3d ${pulseClass}`}
     >
-        {/* Floor Shadow (Simplified in Low LOD) */}
+        {/* Floor Shadow: Scales blur with LOD for realism */}
         <div 
-          className={`absolute inset-0 bg-black/20 rounded-full transition-all duration-500 ${lod === 'high' ? 'blur-xl' : 'blur-sm'}`}
+          className={`absolute inset-0 bg-black/20 rounded-full transition-all duration-500 ${lod === 'high' ? 'blur-xl' : lod === 'medium' ? 'blur-md' : 'blur-sm'}`}
           style={{
             transform: `translateZ(0) scale(${isHovered ? 0.9 : 0.8})`, 
             opacity: isHovered ? 0.4 : 0.2
@@ -220,7 +248,7 @@ const BuildingBlock = React.memo(({ business, isHovered, isSelected, isFeatured,
                       {/* Roof Activity Indicator */}
                       <div className={`absolute top-2 right-2 w-2 h-2 rounded-full ${dotColor} ${showPulse ? 'animate-ping' : ''} z-30`} />
                       
-                      {showDetails && (
+                      {showContent && (
                         <>
                           <div className="w-14 h-14 rounded-lg bg-white p-0.5 border border-slate-700/50 shadow-lg relative mb-2">
                               {business.logoUrl ? (
@@ -236,7 +264,7 @@ const BuildingBlock = React.memo(({ business, isHovered, isSelected, isFeatured,
                       )}
                   </div>
 
-                  {/* Walls - Always rendered for 3D depth, style varies by LOD */}
+                  {/* Walls */}
                   <div className={`${faceClass} origin-bottom rotate-x-90 h-[40px] bottom-0 border-b border-white/5`} style={frontFacade}>
                       {/* Entrance Detail - High LOD only */}
                       {lod === 'high' && (
@@ -444,6 +472,11 @@ const OfficeMap: React.FC<OfficeMapProps> = ({ businesses, favorites, onToggleFa
   const handleMouseUp = () => setIsDragging(false);
 
   const selectedBusiness = useMemo(() => businesses.find(b => b.id === selectedBusinessId) || null, [businesses, selectedBusinessId]);
+
+  // Determine global LOD based on zoom level for all blocks
+  let currentLod: 'low' | 'medium' | 'high' = 'medium';
+  if (viewState.zoom < 0.6) currentLod = 'low';
+  else if (viewState.zoom >= 1.1) currentLod = 'high';
 
   return (
     <div className="flex flex-col lg:flex-row h-full gap-6 w-full relative">
@@ -654,7 +687,7 @@ const OfficeMap: React.FC<OfficeMapProps> = ({ businesses, favorites, onToggleFa
                                    isHovered={hoveredId === business.id}
                                    isSelected={selectedBusinessId === business.id}
                                    isFeatured={false}
-                                   lod={viewState.zoom < 0.8 ? 'low' : 'high'}
+                                   lod={currentLod}
                                    onSelect={(b) => { setSelectedBusinessId(b.id); setIsSidebarOpen(true); }}
                                    onHover={setHoveredId}
                                    t={t}
