@@ -1,5 +1,5 @@
 
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { getSystemInstruction } from '../constants';
 import { Business, BusinessGenome, MatchResult } from "../types";
 
@@ -170,37 +170,42 @@ export const generateBusinessMatches = async (myProfile: BusinessGenome, availab
       4. "analysisPoints" must explain the score using exactly 3 factors: "Industry Sector", "Services Synergy", and "Strategic Fit".
       
       Output Language: ${language === 'ar' ? 'Arabic' : language === 'es' ? 'Spanish' : 'English'}
-
-      RETURN STRICT JSON ARRAY:
-      [
-        {
-          "companyId": "string (must match candidate ID)",
-          "score": number (0-100),
-          "matchReason": "string (short summary)",
-          "sharedInterests": ["string", "string"],
-          "collaborationOpportunity": "string",
-          "analysisPoints": [
-             { "factor": "Industry Sector", "description": "string" },
-             { "factor": "Services Synergy", "description": "string" },
-             { "factor": "Strategic Fit", "description": "string" }
-          ]
-        }
-      ]
     `;
 
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
-        responseMimeType: 'application/json'
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              companyId: { type: Type.STRING },
+              score: { type: Type.NUMBER },
+              matchReason: { type: Type.STRING },
+              sharedInterests: { type: Type.ARRAY, items: { type: Type.STRING } },
+              collaborationOpportunity: { type: Type.STRING },
+              analysisPoints: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    factor: { type: Type.STRING },
+                    description: { type: Type.STRING }
+                  }
+                }
+              }
+            },
+            required: ['companyId', 'score', 'matchReason', 'collaborationOpportunity']
+          }
+        }
       }
     });
 
     const text = response.text || "[]";
-    const jsonMatch = text.match(/\[[\s\S]*\]/);
-    const cleanText = jsonMatch ? jsonMatch[0] : "[]";
-    
-    return JSON.parse(cleanText) as MatchResult[];
+    return JSON.parse(text) as MatchResult[];
 
   } catch (error) {
     console.error("AI Matching Error:", error);

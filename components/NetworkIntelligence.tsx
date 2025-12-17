@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Business, MatchResult, BusinessGenome } from '../types';
@@ -37,6 +38,7 @@ const NetworkIntelligence: React.FC<NetworkIntelligenceProps> = ({ businesses, u
   const [matches, setMatches] = useState<MatchResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMatch, setSelectedMatch] = useState<{result: MatchResult, business: Business} | null>(null);
+  const [introMessage, setIntroMessage] = useState('');
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
@@ -80,12 +82,18 @@ const NetworkIntelligence: React.FC<NetworkIntelligenceProps> = ({ businesses, u
             return matchesSearch && matchesIndustry && matchesSize;
         });
 
-        const [results] = await Promise.all([
-             generateBusinessMatches(userGenome, filteredCandidates, language),
-             delay
-        ]);
+        // Only call AI if we have candidates
+        if (filteredCandidates.length > 0) {
+            const [results] = await Promise.all([
+                generateBusinessMatches(userGenome, filteredCandidates, language),
+                delay
+            ]);
+            setMatches(results);
+        } else {
+            setMatches([]);
+            await delay;
+        }
         
-        setMatches(results);
     } catch (error) {
         console.error(error);
         setMatches([]);
@@ -100,6 +108,14 @@ const NetworkIntelligence: React.FC<NetworkIntelligenceProps> = ({ businesses, u
 
   const getBusinessById = (id: string) => businesses.find(b => b.id === id);
 
+  const handleOpenMatch = (match: MatchResult, business: Business) => {
+      setSelectedMatch({ result: match, business });
+      setIntroMessage(t('smartIntroMsg', { 
+          field: match.sharedInterests[0] || (language === 'ar' ? 'مجال عملكم' : 'your sector'), 
+          topic: match.collaborationOpportunity 
+      }));
+  };
+
   // Sort Logic
   const sortedMatches = useMemo(() => {
       let result = [...matches];
@@ -111,14 +127,14 @@ const NetworkIntelligence: React.FC<NetworkIntelligenceProps> = ({ businesses, u
 
   const getFactorIcon = (factor: string) => {
     const f = factor.toLowerCase();
-    if (f.includes('industry') || f.includes('sector')) return (
-       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+    if (f.includes('industry') || f.includes('sector') || f.includes('قطاع')) return (
+       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
     );
-    if (f.includes('service') || f.includes('match') || f.includes('offer') || f.includes('need') || f.includes('synergy')) return (
-       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
+    if (f.includes('service') || f.includes('match') || f.includes('offer') || f.includes('need') || f.includes('synergy') || f.includes('خدمة')) return (
+       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
     );
-    if (f.includes('strategic') || f.includes('fit') || f.includes('market') || f.includes('size')) return (
-       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+    if (f.includes('strategic') || f.includes('fit') || f.includes('market') || f.includes('size') || f.includes('استراتيجي')) return (
+       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
     );
     return <div className="w-1.5 h-1.5 rounded-full bg-current"></div>;
   };
@@ -238,7 +254,7 @@ const NetworkIntelligence: React.FC<NetworkIntelligenceProps> = ({ businesses, u
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                         </svg>
-                        {t('applyFilters')}
+                        Analyze Matches
                     </>
                 )}
              </button>
@@ -303,73 +319,42 @@ const NetworkIntelligence: React.FC<NetworkIntelligenceProps> = ({ businesses, u
                                 </div>
                             </div>
 
-                            <div className="bg-brand-surface rounded-xl p-4 mb-6 border border-slate-100 flex-1">
+                            <div className="bg-brand-surface rounded-xl p-4 mb-6 border border-slate-100 flex-1 flex flex-col">
                                 <div className="flex items-center gap-2 mb-2">
                                     <svg className={`w-4 h-4 ${isHighPriority ? 'text-brand-gold' : 'text-brand-primary'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                                     <span className={`text-xs font-bold uppercase ${isHighPriority ? 'text-brand-gold' : 'text-brand-primary'}`}>{t('aiInsight')}</span>
                                 </div>
                                 <p className="text-sm text-text-sub leading-relaxed font-medium mb-4">{match.matchReason}</p>
                                 
-                                {match.analysisPoints && match.analysisPoints.length > 0 && (
-                                    <div className="space-y-2 mt-4 pt-4 border-t border-slate-200/60">
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Data-Driven Compatibility</p>
-                                        {match.analysisPoints.map((point, i) => (
-                                        <div 
-                                            key={i} 
-                                            className={`flex items-start gap-3 p-3 rounded-xl border transition-colors ${
-                                                isHighPriority 
-                                                    ? 'bg-brand-gold/5 border-brand-gold/20' 
-                                                    : 'bg-slate-50 border-slate-100'
-                                            }`}
-                                        >
-                                            <div className={`mt-0.5 shrink-0 p-1.5 rounded-lg ${
-                                                isHighPriority 
-                                                    ? 'bg-white text-brand-gold shadow-sm' 
-                                                    : 'bg-white text-slate-400 border border-slate-200'
-                                            }`}>
-                                              {getFactorIcon(point.factor)}
-                                            </div>
-                                            <div>
-                                                <span className={`block text-[10px] font-bold uppercase tracking-wider mb-0.5 ${
-                                                    isHighPriority ? 'text-brand-primary' : 'text-slate-500'
-                                                }`}>
-                                                    {point.factor}
-                                                </span>
-                                                <p className={`text-xs leading-relaxed ${
-                                                    isHighPriority ? 'text-brand-primary/80' : 'text-slate-600'
-                                                }`}>
-                                                    {point.description}
-                                                </p>
-                                            </div>
+                                {match.collaborationOpportunity && (
+                                    <div className={`mt-auto p-3 rounded-xl border ${isHighPriority ? 'bg-brand-gold/5 border-brand-gold/20' : 'bg-blue-50 border-blue-100'}`}>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="text-lg">🚀</span>
+                                            <span className={`text-[10px] font-bold uppercase tracking-wide ${isHighPriority ? 'text-amber-600' : 'text-blue-600'}`}>Opportunity</span>
                                         </div>
-                                        ))}
+                                        <p className={`text-xs leading-relaxed font-bold ${isHighPriority ? 'text-amber-800' : 'text-blue-900'}`}>
+                                            {match.collaborationOpportunity}
+                                        </p>
                                     </div>
                                 )}
                             </div>
 
                              {match.sharedInterests && match.sharedInterests.length > 0 && (
-                                <div className={`mb-6 rounded-xl p-4 border border-dashed ${isHighPriority ? 'bg-yellow-50/50 border-brand-gold/40' : 'bg-slate-50 border-slate-200'}`}>
-                                    <div className="flex items-center gap-2 mb-3">
-                                        <div className={`p-1 rounded-full ${isHighPriority ? 'bg-brand-gold text-white' : 'bg-slate-200 text-slate-500'}`}>
-                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                                            </svg>
-                                        </div>
-                                        <span className={`text-[11px] font-bold uppercase tracking-widest ${isHighPriority ? 'text-brand-primary' : 'text-slate-500'}`}>{t('sharedInterests')}</span>
-                                    </div>
-                                    <div className="flex flex-wrap gap-2">
-                                        {match.sharedInterests.map((tag, tIdx) => (
-                                            <span key={tIdx} className={`px-3 py-1.5 rounded-full text-[11px] font-bold border flex items-center gap-1.5 shadow-sm ${isHighPriority ? 'bg-white border-brand-gold/30 text-brand-primary ring-1 ring-brand-gold/10' : 'bg-white border-slate-200 text-slate-600'}`}>
-                                                <svg className={`w-3 h-3 ${isHighPriority ? 'text-green-600' : 'text-slate-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-                                                {tag}
-                                            </span>
-                                        ))}
-                                    </div>
+                                <div className="mb-6 flex flex-wrap gap-2">
+                                    {match.sharedInterests.slice(0, 3).map((tag, tIdx) => (
+                                        <span key={tIdx} className={`px-2.5 py-1 rounded-full text-[10px] font-bold border flex items-center gap-1 shadow-sm ${isHighPriority ? 'bg-white border-brand-gold/30 text-brand-primary ring-1 ring-brand-gold/10' : 'bg-white border-slate-200 text-slate-600'}`}>
+                                            <svg className={`w-2.5 h-2.5 ${isHighPriority ? 'text-green-600' : 'text-slate-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                            {tag}
+                                        </span>
+                                    ))}
+                                    {match.sharedInterests.length > 3 && (
+                                        <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-slate-50 text-slate-400 border border-slate-200">+{match.sharedInterests.length - 3}</span>
+                                    )}
                                 </div>
                              )}
 
                             <button 
-                                onClick={() => setSelectedMatch({result: match, business})}
+                                onClick={() => handleOpenMatch(match, business)}
                                 className={`w-full py-3 rounded-xl font-bold text-sm shadow-soft transition-all active:scale-95 flex items-center justify-center gap-2 mt-auto ${isHighPriority ? 'bg-brand-gold text-white hover:bg-amber-600' : 'bg-brand-primary text-white hover:bg-[#052c42]'}`}
                             >
                                 <span>{t('requestIntro')}</span>
@@ -429,7 +414,7 @@ const NetworkIntelligence: React.FC<NetworkIntelligenceProps> = ({ businesses, u
                                         </div>
                                         
                                         <button 
-                                            onClick={() => setSelectedMatch({result: match, business})}
+                                            onClick={() => handleOpenMatch(match, business)}
                                             className="w-full py-2.5 rounded-lg border border-brand-primary text-brand-primary font-bold text-xs hover:bg-brand-primary hover:text-white transition-colors flex items-center justify-center gap-2"
                                         >
                                             <span>Connect</span>
@@ -448,27 +433,26 @@ const NetworkIntelligence: React.FC<NetworkIntelligenceProps> = ({ businesses, u
       {/* Introduction Room Modal */}
       {selectedMatch && (
          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-brand-primary/40 backdrop-blur-sm">
-            <div className="bg-white w-full max-w-2xl rounded-3xl shadow-elevated overflow-hidden animate-slide-up">
-               <div className="p-8 border-b border-slate-100 flex justify-between items-start bg-brand-surface">
+            <div className="bg-white w-full max-w-2xl rounded-3xl shadow-elevated overflow-hidden animate-slide-up flex flex-col max-h-[85vh]">
+               <div className="p-8 border-b border-slate-100 flex justify-between items-start bg-brand-surface shrink-0">
                   <div>
                      <h3 className="text-xl font-bold text-brand-primary mb-1">{t('introRoom')}</h3>
-                     <p className="text-sm text-brand-secondary">{t('smartIntroMsg', { field: selectedMatch.result.sharedInterests[0] || 'Business', topic: selectedMatch.result.collaborationOpportunity })}</p>
+                     <p className="text-sm text-brand-secondary">AI-Facilitated Connection</p>
                   </div>
                   <button onClick={() => setSelectedMatch(null)} className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-400 hover:text-red-500">✕</button>
                </div>
                
-               <div className="p-8 flex flex-col gap-6">
-                  <div className="flex items-center justify-between gap-4">
+               <div className="p-8 flex-1 overflow-y-auto custom-scrollbar">
+                  <div className="flex items-center justify-between gap-4 mb-8">
                      {/* Me */}
                      <div className="flex-1 bg-white border border-slate-200 p-4 rounded-xl text-center shadow-sm">
                         <div className="w-12 h-12 bg-brand-primary rounded-full mx-auto mb-2 flex items-center justify-center text-white font-bold text-xl">M</div>
-                        <div className="font-bold text-brand-primary text-sm">{MY_BUSINESS_GENOME.name}</div>
+                        <div className="font-bold text-brand-primary text-sm truncate">{MY_BUSINESS_GENOME.name}</div>
                      </div>
                      
-                     <div className="flex flex-col items-center justify-center text-slate-300 px-4">
-                        <div className="h-px w-full min-w-[40px] bg-slate-300 mb-2"></div>
-                        <span className="text-xs font-bold uppercase tracking-widest whitespace-nowrap text-green-600 bg-green-50 px-2 py-1 rounded-md">{selectedMatch.result.score}% Match</span>
-                        <div className="h-px w-full min-w-[40px] bg-slate-300 mt-2"></div>
+                     <div className="flex flex-col items-center justify-center text-slate-300 px-2 shrink-0">
+                        <span className="text-xs font-bold uppercase tracking-widest whitespace-nowrap text-green-600 bg-green-50 px-2 py-1 rounded-md mb-1">{selectedMatch.result.score}% Match</span>
+                        <div className="w-full h-px bg-slate-300"></div>
                      </div>
 
                      {/* Them */}
@@ -480,19 +464,43 @@ const NetworkIntelligence: React.FC<NetworkIntelligenceProps> = ({ businesses, u
                                 <span className="text-xs font-bold">LOGO</span>
                            )}
                         </div>
-                        <div className="font-bold text-brand-primary text-sm">{selectedMatch.business.name}</div>
+                        <div className="font-bold text-brand-primary text-sm truncate">{selectedMatch.business.name}</div>
                      </div>
                   </div>
 
-                  <div className="bg-blue-50 p-6 rounded-xl border border-blue-100">
-                     <h4 className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-3">{t('collaborationOpp')}</h4>
-                     <p className="text-brand-primary font-medium leading-relaxed">
-                        "{selectedMatch.result.collaborationOpportunity}"
-                     </p>
-                  </div>
+                  <div className="space-y-6">
+                      {/* Analysis Points */}
+                      {selectedMatch.result.analysisPoints && (
+                          <div className="grid gap-3">
+                              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Compatibility Analysis</h4>
+                              {selectedMatch.result.analysisPoints.map((point, i) => (
+                                  <div key={i} className="flex gap-4 p-4 rounded-xl bg-slate-50 border border-slate-100">
+                                      <div className="mt-1 text-brand-primary">{getFactorIcon(point.factor)}</div>
+                                      <div>
+                                          <h5 className="text-sm font-bold text-slate-700">{point.factor}</h5>
+                                          <p className="text-xs text-slate-500 leading-relaxed mt-1">{point.description}</p>
+                                      </div>
+                                  </div>
+                              ))}
+                          </div>
+                      )}
 
-                  <button className="w-full py-4 bg-brand-primary text-white font-bold rounded-xl hover:bg-[#052c42] shadow-lg transition-all active:scale-95">
-                     {t('sendMessage')}
+                      {/* Message Input */}
+                      <div>
+                          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">{t('message')}</h4>
+                          <textarea
+                              value={introMessage}
+                              onChange={(e) => setIntroMessage(e.target.value)}
+                              className="w-full h-32 p-4 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary outline-none text-sm font-medium text-slate-700 resize-none"
+                          />
+                      </div>
+                  </div>
+               </div>
+
+               <div className="p-6 border-t border-slate-100 bg-white shrink-0">
+                  <button className="w-full py-4 bg-brand-primary text-white font-bold rounded-xl hover:bg-[#052c42] shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2">
+                     <span>{t('sendMessage')}</span>
+                     <svg className="w-5 h-5 rtl:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
                   </button>
                </div>
             </div>

@@ -18,17 +18,18 @@ import LoadingScreen from './components/LoadingScreen';
 import NetworkIntelligence from './components/NetworkIntelligence'; 
 import BusinessNetworkPage from './components/BusinessNetworkPage'; 
 import ConsultingPage from './components/ConsultingPage'; 
+import MentorsPage from './components/MentorsPage';
 import { Business, ServiceType, Invoice, BusinessGenome } from './types';
 import { getMockBusinesses, MY_BUSINESS_GENOME } from './constants';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Language } from './utils/translations';
 
-type AppView = 'home' | 'map' | 'services' | 'business-network' | 'consulting' | 'profile' | 'subscription' | 'about' | 'faq' | 'contact' | 'our-services';
+type AppView = 'home' | 'map' | 'services' | 'business-network' | 'consulting' | 'mentors' | 'profile' | 'subscription' | 'about' | 'faq' | 'contact' | 'our-services';
 
 const App: React.FC = () => {
   const { t, language, setLanguage } = useLanguage();
   
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [activeTab, setActiveTab] = useState<AppView>('home');
@@ -192,6 +193,7 @@ const App: React.FC = () => {
       { id: 'map', label: 'map' },
       { id: 'our-services', label: 'ourServices' },
       { id: 'consulting', label: 'consultingPage' },
+      { id: 'mentors', label: 'mentorsPage' },
       { id: 'business-network', label: 'businessNetworkPage' },
       { id: 'subscription', label: 'plansTitle' },
   ];
@@ -231,12 +233,12 @@ const App: React.FC = () => {
             </div>
 
             {/* Desktop Navigation */}
-            <nav className="hidden lg:flex items-center bg-[#252932] border border-white/5 rounded-full p-1.5">
+            <nav className="hidden xl:flex items-center bg-[#252932] border border-white/5 rounded-full p-1.5">
               {navItems.map((item) => (
                 <button
                   key={item.id}
                   onClick={() => setActiveTab(item.id)}
-                  className={`relative px-5 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                  className={`relative px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
                     activeTab === item.id 
                       ? 'bg-brand-primary text-white shadow-md' 
                       : 'text-slate-400 hover:text-white hover:bg-white/5'
@@ -294,7 +296,7 @@ const App: React.FC = () => {
             {/* Mobile Menu Toggle */}
             <button 
                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-               className="lg:hidden p-2 text-white hover:bg-white/10 rounded-lg transition-colors"
+               className="xl:hidden p-2 text-white hover:bg-white/10 rounded-lg transition-colors"
             >
                {mobileMenuOpen ? (
                   <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -306,7 +308,7 @@ const App: React.FC = () => {
 
         {/* Mobile Menu Content */}
         {mobileMenuOpen && (
-           <div className="lg:hidden absolute top-full left-0 right-0 bg-brand-dark border-t border-white/10 shadow-xl p-6 flex flex-col gap-2 animate-slide-up">
+           <div className="xl:hidden absolute top-full left-0 right-0 bg-brand-dark border-t border-white/10 shadow-xl p-6 flex flex-col gap-2 animate-slide-up h-screen overflow-y-auto pb-20">
               {navItems.map((item) => (
                 <button
                   key={item.id}
@@ -354,6 +356,7 @@ const App: React.FC = () => {
            {activeTab === 'our-services' && <ServicesPage />}
            {activeTab === 'business-network' && <BusinessNetworkPage businesses={businesses} />}
            {activeTab === 'consulting' && <ConsultingPage />}
+           {activeTab === 'mentors' && <MentorsPage />}
            {activeTab === 'faq' && <div className="max-w-7xl mx-auto px-6 mt-8"><FaqPage /></div>}
            {activeTab === 'contact' && <div className="max-w-7xl mx-auto px-6 mt-8"><ContactPage /></div>}
 

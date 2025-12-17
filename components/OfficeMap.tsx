@@ -13,6 +13,14 @@ const PADDING = 120;
 const GAP = 120;
 const CELL_SIZE = (CONTAINER_SIZE - (PADDING * 2) - (GAP * (GRID_COLS - 1))) / GRID_COLS;
 
+const getCellCenter = (gridPos: {x: number, y: number}) => {
+    const colIndex = gridPos.x - 1;
+    const rowIndex = gridPos.y - 1;
+    const x = PADDING + (colIndex * CELL_SIZE) + (colIndex * GAP) + (CELL_SIZE / 2);
+    const y = PADDING + (rowIndex * CELL_SIZE) + (rowIndex * GAP) + (CELL_SIZE / 2);
+    return { x, y };
+};
+
 type MapMode = 'standard' | 'heatmap' | 'networking' | 'traffic';
 
 interface OfficeMapProps {
@@ -37,9 +45,14 @@ interface BuildingBlockProps {
 }
 
 const BuildingBlock = React.memo(({ business, isHovered, isSelected, isFeatured, lod, onSelect, onHover, t, mapMode }: BuildingBlockProps) => {
+  const isLowLod = lod === 'low';
+  const isHighLod = lod === 'high';
+  const isDarkMode = mapMode === 'heatmap';
+
   // Enhanced Dimensions & Physics
   const baseDepth = 40;
-  const hoverLift = isHovered ? 30 : 0; 
+  // Reduce hover lift in low LOD to minimize motion/repaint
+  const hoverLift = isHovered ? (isLowLod ? 0 : 30) : 0; 
   
   // Dynamic Colors based on State
   let statusColor = 'bg-slate-100'; 
@@ -52,22 +65,30 @@ const BuildingBlock = React.memo(({ business, isHovered, isSelected, isFeatured,
      heatmapIntensity = Math.min(visitors / 50, 1); 
   }
 
+  // Consistent Smooth HSL Calculation for Heatmap
+  // Interpolate from Blue (220deg) to Red (0deg) for a smoother cool-to-hot transition
+  const heatmapHue = Math.max(0, 220 - (heatmapIntensity * 220));
+  
+  // Keep saturation high but controlled (85%) for vibrancy without neon-burn
+  const heatmapSat = 85; 
+  
+  // Lightness shifts slightly from 60% (cool/light) to 45% (hot/intense) to add depth
+  const heatmapLight = 60 - (heatmapIntensity * 15); 
+  
+  const heatmapColorString = `hsl(${heatmapHue}, ${heatmapSat}%, ${heatmapLight}%)`;
+
   // Animation class for high traffic/activity - Disable in Low LOD for performance
-  const showPulse = lod !== 'low' && ((mapMode === 'heatmap' && heatmapIntensity > 0.7) || (mapMode === 'traffic' && (business.activeVisitors || 0) > 40));
+  const showPulse = !isLowLod && ((mapMode === 'heatmap' && heatmapIntensity > 0.7) || (mapMode === 'traffic' && (business.activeVisitors || 0) > 40));
   const pulseClass = showPulse ? 'animate-pulse-slow' : '';
 
   if (business.isOccupied) {
       if (mapMode === 'heatmap') {
          // Heatmap coloring
-         if (heatmapIntensity > 0.8) statusColor = 'bg-red-500 shadow-glow';
-         else if (heatmapIntensity > 0.6) statusColor = 'bg-orange-500';
-         else if (heatmapIntensity > 0.4) statusColor = 'bg-yellow-500';
-         else statusColor = 'bg-blue-500';
-         
+         statusColor = 'shadow-glow text-white'; 
          dotColor = 'bg-white';
          statusText = `${business.activeVisitors} ${t('visitorNow')}`;
       } else if (mapMode === 'traffic') {
-         // Traffic coloring (Active Visitors)
+         // Traffic coloring
          const visitors = business.activeVisitors || 0;
          if (visitors > 40) {
              statusColor = 'bg-rose-600 shadow-glow';
@@ -81,7 +102,7 @@ const BuildingBlock = React.memo(({ business, isHovered, isSelected, isFeatured,
          }
          statusText = `${visitors} ${t('visitorNow')}`;
       } else if (mapMode === 'networking') {
-         // Networking coloring (Category)
+         // Networking coloring
          switch (business.category) {
              case 'TECHNOLOGY': statusColor = 'bg-blue-600'; break;
              case 'ENGINEERING': statusColor = 'bg-purple-600'; break;
@@ -106,13 +127,14 @@ const BuildingBlock = React.memo(({ business, isHovered, isSelected, isFeatured,
     ? 'border-brand-accent ring-2 ring-brand-accent ring-opacity-50' 
     : isHovered
       ? 'border-brand-primary shadow-2xl'
-      : 'border-white/20';
+      : (isDarkMode ? 'border-white/10' : 'border-white/20');
 
   // Details Visibility: High LOD shows text/logo. Medium shows solid block. Hover always shows detail.
-  const showContent = lod === 'high' || isHovered;
+  // In Low LOD, only show if selected or hovered to reduce draw calls.
+  const showContent = isHighLod || isHovered;
   const showBanner = (showContent || isSelected) && business.isOccupied; 
   
-  const faceClass = "absolute inset-0 backface-hidden transition-all duration-300";
+  const faceClass = `absolute inset-0 backface-hidden ${!isLowLod ? 'transition-all duration-300' : ''}`;
 
   // --- Premium Texture & Facade Logic ---
   const { frontFacade, sideFacade, roofStyle } = useMemo(() => {
@@ -124,11 +146,15 @@ const BuildingBlock = React.memo(({ business, isHovered, isSelected, isFeatured,
 
     if (isOcc) {
         if (mapMode === 'heatmap') {
-             // Smoothed Heatmap Gradient: Blue -> Teal -> Green -> Yellow -> Red
-             const hue = Math.max(0, 240 - (heatmapIntensity * 240));
-             wallBase = `hsl(${hue}, 75%, 50%)`;
-             // Vertical gradient for "volume" heat effect
-             wallGradient = `linear-gradient(to bottom, hsl(${hue}, 85%, 60%) 0%, hsl(${hue}, 75%, 45%) 100%)`;
+             wallBase = heatmapColorString;
+             // Only compute gradient if not low LOD
+             if (!isLowLod) {
+                // Smoother gradient using calculated HSL values for depth
+                // Creates a subtle vertical shading from light to dark based on the base HSL
+                wallGradient = `linear-gradient(to bottom, 
+                    hsl(${heatmapHue}, ${heatmapSat}%, ${Math.min(100, heatmapLight + 12)}%) 0%, 
+                    hsl(${heatmapHue}, ${heatmapSat}%, ${Math.max(0, heatmapLight - 12)}%) 100%)`;
+             }
         } else if (mapMode === 'traffic') {
              const visitors = business.activeVisitors || 0;
              if (visitors > 40) wallBase = '#e11d48'; 
@@ -145,60 +171,65 @@ const BuildingBlock = React.memo(({ business, isHovered, isSelected, isFeatured,
         }
     }
 
-    // --- LOW & MEDIUM LOD (Optimized) ---
-    // No gradients for windows to save performance on zoomed out views.
-    if (lod !== 'high') {
+    // --- LOW LOD (Performance Optimized) ---
+    if (isLowLod) {
+        return {
+            frontFacade: { backgroundColor: wallBase },
+            sideFacade: { backgroundColor: wallBase, filter: 'brightness(0.7)' },
+            roofStyle: { 
+                backgroundColor: isOcc ? (mapMode === 'standard' ? '#0F172A' : wallBase) : '#FFFFFF',
+                border: isOcc ? 'none' : '1px solid #e2e8f0', // Simpler border
+            }
+        };
+    }
+
+    const transitionStyle = 'background-color 0.3s, background-image 0.3s';
+
+    // --- MEDIUM LOD (Balanced) ---
+    if (!isHighLod) {
         const bgImage = (mapMode === 'heatmap' && wallGradient) ? wallGradient : 'none';
         return {
             frontFacade: { 
                 backgroundColor: wallBase, 
                 backgroundImage: bgImage, 
-                // Medium gets a subtle inset shadow for depth, Low gets nothing
-                boxShadow: lod === 'medium' ? 'inset 0 0 20px rgba(0,0,0,0.3)' : 'none',
-                transition: 'background-color 0.3s'
+                boxShadow: 'inset 0 0 20px rgba(0,0,0,0.3)',
+                transition: transitionStyle
             },
             sideFacade: { 
                 backgroundColor: wallBase, 
                 backgroundImage: bgImage, 
                 filter: 'brightness(0.7)', 
                 boxShadow: 'none',
-                transition: 'background-color 0.3s'
+                transition: transitionStyle
             },
             roofStyle: { 
                 backgroundColor: isOcc ? (mapMode === 'standard' ? '#0F172A' : wallBase) : '#FFFFFF',
                 border: isOcc ? 'none' : '1px dashed #cbd5e1',
                 backgroundImage: 'none',
-                transition: 'background-color 0.3s'
+                transition: transitionStyle
             }
         };
     }
 
     // --- HIGH LOD RENDERING (Detailed) ---
-    // Windows / Lights
     const winLight = 'rgba(255,255,255,0.9)';
     const winDim = 'rgba(255,255,255,0.1)';
     const activeWin = isOcc ? (mapMode !== 'standard' ? winDim : winLight) : winDim;
     
-    // Gradient Windows Pattern
     const windowPattern = `
       linear-gradient(to bottom, transparent 5%, ${activeWin} 5%, ${activeWin} 20%, transparent 20%, transparent 40%, ${activeWin} 40%, ${activeWin} 55%, transparent 55%),
       linear-gradient(to right, transparent 5%, rgba(255,255,255,0.05) 5%, rgba(255,255,255,0.05) 95%, transparent 95%)
     `;
 
-    // Combine window pattern with heatmap gradient if active
-    const finalBgImage = (mapMode === 'heatmap' && wallGradient) 
-        ? `${windowPattern}, ${wallGradient}` 
-        : windowPattern;
-        
-    const finalBgSize = (mapMode === 'heatmap' && wallGradient)
-        ? '100% 40px, 20px 100%, 100% 100%'
-        : '100% 40px, 20px 100%';
+    const finalBgImage = (mapMode === 'heatmap' && wallGradient) ? `${windowPattern}, ${wallGradient}` : windowPattern;
+    const finalBgSize = (mapMode === 'heatmap' && wallGradient) ? '100% 40px, 20px 100%, 100% 100%' : '100% 40px, 20px 100%';
 
     const front = {
       backgroundColor: wallBase,
       backgroundImage: finalBgImage,
       backgroundSize: finalBgSize,
-      boxShadow: 'inset 0 0 20px rgba(0,0,0,0.5)'
+      boxShadow: 'inset 0 0 20px rgba(0,0,0,0.5)',
+      transition: transitionStyle
     };
     
     const side = {
@@ -206,16 +237,23 @@ const BuildingBlock = React.memo(({ business, isHovered, isSelected, isFeatured,
       backgroundImage: finalBgImage,
       backgroundSize: finalBgSize,
       filter: 'brightness(0.85)',
-      boxShadow: 'inset 0 0 20px rgba(0,0,0,0.5)'
+      boxShadow: 'inset 0 0 20px rgba(0,0,0,0.5)',
+      transition: transitionStyle
     };
 
     const roof = {
         backgroundColor: isOcc ? (mapMode !== 'standard' ? wallBase : '#0F172A') : '#FFFFFF',
         backgroundImage: isOcc ? 'radial-gradient(circle at center, rgba(255,255,255,0.1) 0%, transparent 60%)' : 'none',
+        transition: transitionStyle
     };
 
     return { frontFacade: front, sideFacade: side, roofStyle: roof };
-  }, [business.isOccupied, lod, mapMode, heatmapIntensity, business.category, business.activeVisitors]);
+  }, [business.isOccupied, lod, isLowLod, isHighLod, mapMode, heatmapIntensity, business.category, business.activeVisitors, heatmapColorString, heatmapHue, heatmapSat, heatmapLight]);
+
+  // Simplify roof aesthetics in Low LOD
+  const roofClasses = isLowLod
+    ? `absolute inset-0 border-2 ${borderColor} overflow-hidden flex flex-col items-center justify-center p-2 text-center backface-hidden z-20`
+    : `absolute inset-0 border-2 ${borderColor} rounded-sm overflow-hidden flex flex-col items-center justify-center p-2 text-center shadow-inner backface-hidden z-20 transition-colors duration-300`;
 
   return (
     <div
@@ -224,32 +262,36 @@ const BuildingBlock = React.memo(({ business, isHovered, isSelected, isFeatured,
       onMouseLeave={() => onHover(null)}
       className={`relative w-full h-full group pointer-events-auto cursor-pointer preserve-3d ${pulseClass}`}
     >
-        {/* Floor Shadow: Scales blur with LOD for realism */}
-        <div 
-          className={`absolute inset-0 bg-black/20 rounded-full transition-all duration-500 ${lod === 'high' ? 'blur-xl' : lod === 'medium' ? 'blur-md' : 'blur-sm'}`}
-          style={{
-            transform: `translateZ(0) scale(${isHovered ? 0.9 : 0.8})`, 
-            opacity: isHovered ? 0.4 : 0.2
-          }}
-        />
+        {/* Floor Shadow: Only show in Medium/High LOD */}
+        {!isLowLod && (
+            <div 
+              className={`absolute inset-0 bg-black/20 rounded-full transition-all duration-500 ${isHighLod ? 'blur-xl' : 'blur-md'}`}
+              style={{
+                transform: `translateZ(0) scale(${isHovered ? 0.9 : 0.8})`, 
+                opacity: isHovered ? 0.4 : 0.2
+              }}
+            />
+        )}
 
         {/* 3D Structure */}
         <div 
-          className="w-full h-full preserve-3d transition-transform duration-500 cubic-bezier(0.4, 0, 0.2, 1) will-change-transform"
+          className={`w-full h-full preserve-3d ${!isLowLod ? 'transition-transform duration-500 cubic-bezier(0.4, 0, 0.2, 1)' : 'transition-none'} will-change-transform`}
           style={{ transform: `translateZ(${baseDepth + hoverLift}px)` }}
         >
             {business.isOccupied ? (
                 <>
                   {/* Roof */}
                   <div 
-                    className={`absolute inset-0 border-2 ${borderColor} rounded-sm overflow-hidden flex flex-col items-center justify-center p-2 text-center shadow-inner backface-hidden z-20 transition-colors duration-300`}
+                    className={roofClasses}
                     style={roofStyle}
                   >
                       {/* Roof Activity Indicator */}
-                      <div className={`absolute top-2 right-2 w-2 h-2 rounded-full ${dotColor} ${showPulse ? 'animate-ping' : ''} z-30`} />
+                      {!isLowLod && (
+                        <div className={`absolute top-2 right-2 w-2 h-2 rounded-full ${dotColor} ${showPulse ? 'animate-ping' : ''} z-30`} />
+                      )}
                       
                       {showContent && (
-                        <>
+                        <div className="animate-fade-in flex flex-col items-center">
                           <div className="w-14 h-14 rounded-lg bg-white p-0.5 border border-slate-700/50 shadow-lg relative mb-2">
                               {business.logoUrl ? (
                                   <img src={business.logoUrl} alt="" className="w-full h-full object-cover rounded" />
@@ -257,17 +299,17 @@ const BuildingBlock = React.memo(({ business, isHovered, isSelected, isFeatured,
                                   <div className="w-full h-full bg-slate-900 flex items-center justify-center text-[8px] text-white">LOGO</div>
                               )}
                           </div>
-                          {(lod === 'high' || isHovered) && (
+                          {(isHighLod || isHovered) && (
                              <h3 className="font-sans font-bold text-white text-[10px] truncate w-full px-1 tracking-wide uppercase">{business.name}</h3>
                           )}
-                        </>
+                        </div>
                       )}
                   </div>
 
                   {/* Walls */}
                   <div className={`${faceClass} origin-bottom rotate-x-90 h-[40px] bottom-0 border-b border-white/5`} style={frontFacade}>
                       {/* Entrance Detail - High LOD only */}
-                      {lod === 'high' && (
+                      {isHighLod && (
                          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-6 bg-black/80 border-t border-white/20"></div>
                       )}
                   </div>
@@ -277,14 +319,14 @@ const BuildingBlock = React.memo(({ business, isHovered, isSelected, isFeatured,
                 </>
             ) : (
                 /* Vacant Plot */
-                <div className="w-full h-full relative preserve-3d opacity-80 hover:opacity-100 transition-all duration-300 group-hover:scale-105">
-                  <div className={`absolute inset-0 border-2 border-dashed border-slate-300 bg-white/60 backdrop-blur-sm rounded-sm flex flex-col items-center justify-center ${borderColor}`}>
+                <div className={`w-full h-full relative preserve-3d ${!isLowLod ? 'opacity-80 hover:opacity-100 transition-all duration-300 group-hover:scale-105' : 'opacity-60'}`}>
+                  <div className={`absolute inset-0 border-2 ${isLowLod ? (isDarkMode ? 'border-white/10' : 'border-slate-200') : (isDarkMode ? 'border-white/20' : 'border-slate-300')} ${isDarkMode ? 'bg-slate-800/50' : 'bg-white/60'} ${!isLowLod ? 'backdrop-blur-sm rounded-sm' : ''} flex flex-col items-center justify-center ${borderColor}`}>
                       {isHovered && (
                           <div className="bg-brand-accent text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-lg uppercase tracking-wide">
                               {t('available')}
                           </div>
                       )}
-                      {!isHovered && <span className="text-3xl text-slate-300">+</span>}
+                      {!isLowLod && !isHovered && <span className={`text-3xl ${isDarkMode ? 'text-white/20' : 'text-slate-300'}`}>+</span>}
                   </div>
                 </div>
             )}
@@ -301,10 +343,16 @@ const BuildingBlock = React.memo(({ business, isHovered, isSelected, isFeatured,
                         transform: `translate(-50%, -100%) rotateX(var(--map-inv-rotate-x)) rotateZ(var(--map-inv-rotate-z))`
                     }}
                  >
-                    <div className={`px-3 py-1.5 rounded-lg shadow-xl border border-white/20 flex items-center gap-2 ${statusColor} text-white backdrop-blur-md`}>
+                    <div 
+                        className={`px-3 py-1.5 rounded-lg shadow-xl border border-white/20 flex items-center gap-2 ${statusColor} backdrop-blur-md`}
+                        style={mapMode === 'heatmap' ? { backgroundColor: heatmapColorString } : {}}
+                    >
                       <span className="text-[10px] font-bold uppercase tracking-widest">{statusText}</span>
                     </div>
-                    <div className={`w-0.5 h-6 opacity-80 ${statusColor}`}></div>
+                    <div 
+                        className={`w-0.5 h-6 opacity-80 ${statusColor}`}
+                        style={mapMode === 'heatmap' ? { backgroundColor: heatmapColorString } : {}}
+                    ></div>
                  </div>
               </div>
             )}
@@ -313,23 +361,84 @@ const BuildingBlock = React.memo(({ business, isHovered, isSelected, isFeatured,
   );
 });
 
-const DataGrid: React.FC = () => {
+interface DataGridProps {
+  mapMode: MapMode;
+  businesses: Business[];
+  lod: 'high' | 'medium' | 'low';
+}
+
+const DataGrid: React.FC<DataGridProps> = ({ mapMode, businesses, lod }) => {
+    // Dynamic Grid Color
+    const gridColor = mapMode === 'heatmap' ? 'rgba(255, 255, 255, 0.1)' : '#94a3b8';
+    const isLowLod = lod === 'low';
+
     return (
-        <div className="absolute inset-0 pointer-events-none preserve-3d">
-            {/* Base Grid */}
+        <div className="absolute inset-0 pointer-events-none preserve-3d transition-all duration-500">
+            {/* Base Grid - Visibility scales with mode */}
             <div 
-                className="absolute inset-0 opacity-20" 
+                className={`absolute inset-0 transition-opacity duration-500 ${mapMode === 'heatmap' ? 'opacity-20' : 'opacity-20'}`} 
                 style={{ 
-                    backgroundImage: 'linear-gradient(#94a3b8 1px, transparent 1px), linear-gradient(90deg, #94a3b8 1px, transparent 1px)', 
+                    backgroundImage: `linear-gradient(${gridColor} 1px, transparent 1px), linear-gradient(90deg, ${gridColor} 1px, transparent 1px)`, 
                     backgroundSize: '40px 40px' 
                 }}
             />
             
-            {/* Moving Light Streams */}
-            <div className="absolute inset-0 overflow-hidden">
-                <div className="absolute top-1/2 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-blue-400 to-transparent opacity-50 animate-pulse"></div>
-                <div className="absolute left-1/2 top-0 bottom-0 w-[1px] bg-gradient-to-b from-transparent via-blue-400 to-transparent opacity-50 animate-pulse"></div>
-            </div>
+            {/* Mode: Standard - Subtle Blue Pulses (Disable in Low LOD) */}
+            {mapMode === 'standard' && !isLowLod && (
+                <div className="absolute inset-0 overflow-hidden opacity-50 animate-fade-in">
+                    <div className="absolute top-1/2 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-blue-400 to-transparent animate-pulse"></div>
+                    <div className="absolute left-1/2 top-0 bottom-0 w-[1px] bg-gradient-to-b from-transparent via-blue-400 to-transparent animate-pulse"></div>
+                </div>
+            )}
+
+            {/* Mode: Heatmap - Dynamic Ground Overlay */}
+            {mapMode === 'heatmap' && (
+                <div className="absolute inset-0 pointer-events-none transition-opacity duration-500">
+                     {businesses.filter(b => b.isOccupied && (b.activeVisitors || 0) > 0).map(business => {
+                         const colIndex = business.gridPosition.x - 1;
+                         const rowIndex = business.gridPosition.y - 1;
+                         const x = PADDING + (colIndex * CELL_SIZE) + (colIndex * GAP) + (CELL_SIZE / 2);
+                         const y = PADDING + (rowIndex * CELL_SIZE) + (rowIndex * GAP) + (CELL_SIZE / 2);
+                         
+                         const intensity = Math.min((business.activeVisitors || 0) / 50, 1);
+                         const size = 200 + (intensity * 300); // Dynamic Size
+                         const opacity = 0.2 + (intensity * 0.4); // Dynamic Opacity
+                         
+                         // Gradient Color Logic matches building logic (Smooth 220 -> 0)
+                         const hue = Math.max(0, 220 - (intensity * 220));
+                         
+                         return (
+                             <div 
+                                key={business.id}
+                                className="absolute rounded-full blur-[80px]"
+                                style={{
+                                    left: x,
+                                    top: y,
+                                    width: size,
+                                    height: size,
+                                    transform: 'translate(-50%, -50%)',
+                                    backgroundColor: `hsla(${hue}, 85%, 55%, 1)`,
+                                    opacity: opacity,
+                                    mixBlendMode: 'screen'
+                                }}
+                             />
+                         );
+                     })}
+                </div>
+            )}
+
+            {/* Mode: Networking - Connection Lines Pattern Background */}
+            {mapMode === 'networking' && !isLowLod && (
+                <div className="absolute inset-0 opacity-10 animate-fade-in transition-opacity duration-500">
+                    <svg className="w-full h-full">
+                        <pattern id="net-pattern" x="0" y="0" width="60" height="60" patternUnits="userSpaceOnUse">
+                            <circle cx="30" cy="30" r="1" fill="#2563eb" />
+                            <path d="M0 0L60 60 M60 0L0 60" stroke="#2563eb" strokeWidth="0.5" />
+                        </pattern>
+                        <rect width="100%" height="100%" fill="url(#net-pattern)" />
+                    </svg>
+                </div>
+            )}
         </div>
     );
 }
@@ -377,6 +486,86 @@ const OfficeMap: React.FC<OfficeMapProps> = ({ businesses, favorites, onToggleFa
     observer.observe(mapContainerRef.current);
     return () => observer.disconnect();
   }, []);
+
+  // Compute networking connections
+  const networkingConnections = useMemo(() => {
+    if (mapMode !== 'networking') return [];
+    
+    const connections: { id: string, participants: string[], start: {x:number,y:number}, end: {x:number,y:number}, type: 'industry'|'synergy' }[] = [];
+    const occupied = businesses.filter(b => b.isOccupied);
+
+    for (let i = 0; i < occupied.length; i++) {
+        for (let j = i + 1; j < occupied.length; j++) {
+            const b1 = occupied[i];
+            const b2 = occupied[j];
+            
+            // Check connections
+            let type: 'industry'|'synergy' | null = null;
+            
+            // Synergy check (Needs/Offers) - check for overlapping text in needs/offers
+            const hasSynergy = b1.genomeProfile?.servicesNeeded?.some(need => 
+                b2.genomeProfile?.servicesOffered?.some(offer => offer.toLowerCase().includes(need.toLowerCase()) || need.toLowerCase().includes(offer.toLowerCase()))
+            ) || b2.genomeProfile?.servicesNeeded?.some(need => 
+                b1.genomeProfile?.servicesOffered?.some(offer => offer.toLowerCase().includes(need.toLowerCase()) || need.toLowerCase().includes(offer.toLowerCase()))
+            );
+
+            if (hasSynergy) {
+                type = 'synergy';
+            } else if (b1.category === b2.category) {
+                type = 'industry';
+            }
+
+            if (type) {
+                connections.push({
+                    id: `${b1.id}-${b2.id}`,
+                    participants: [b1.id, b2.id],
+                    start: getCellCenter(b1.gridPosition),
+                    end: getCellCenter(b2.gridPosition),
+                    type
+                });
+            }
+        }
+    }
+    return connections;
+  }, [businesses, mapMode]);
+
+  // Compute Traffic Segments
+  const trafficSegments = useMemo(() => {
+    if (mapMode !== 'traffic') return [];
+    const segments = [];
+    
+    // Vertical Roads (between cols)
+    for (let c = 1; c < GRID_COLS; c++) {
+        // Gap between col c and c+1
+        const x = PADDING + (c-1)*(CELL_SIZE+GAP) + CELL_SIZE + GAP/2;
+        // Calculate load: businesses in col c and c+1
+        const nearbyBusinesses = businesses.filter(b => b.isOccupied && (b.gridPosition.x === c || b.gridPosition.x === c + 1));
+        const totalVisitors = nearbyBusinesses.reduce((acc, b) => acc + (b.activeVisitors || 0), 0);
+        segments.push({
+            id: `v-${c}`,
+            x1: x, y1: PADDING,
+            x2: x, y2: CONTAINER_SIZE - PADDING,
+            visitors: totalVisitors,
+            orientation: 'vertical'
+        });
+    }
+
+    // Horizontal Roads (between rows)
+    for (let r = 1; r < GRID_COLS; r++) { 
+         // Gap between row r and r+1
+         const y = PADDING + (r-1)*(CELL_SIZE+GAP) + CELL_SIZE + GAP/2;
+         const nearby = businesses.filter(b => b.isOccupied && (b.gridPosition.y === r || b.gridPosition.y === r + 1));
+         const total = nearby.reduce((acc, b) => acc + (b.activeVisitors || 0), 0);
+         segments.push({
+             id: `h-${r}`,
+             x1: PADDING, y1: y,
+             x2: CONTAINER_SIZE - PADDING, y2: y,
+             visitors: total,
+             orientation: 'horizontal'
+         });
+    }
+    return segments;
+  }, [businesses, mapMode]);
 
   const handleAISearch = async () => {
     if (!searchQuery.trim()) return;
@@ -475,14 +664,14 @@ const OfficeMap: React.FC<OfficeMapProps> = ({ businesses, favorites, onToggleFa
 
   // Determine global LOD based on zoom level for all blocks
   let currentLod: 'low' | 'medium' | 'high' = 'medium';
-  if (viewState.zoom < 0.6) currentLod = 'low';
-  else if (viewState.zoom >= 1.1) currentLod = 'high';
+  if (viewState.zoom < 0.7) currentLod = 'low'; 
+  else if (viewState.zoom > 1.3) currentLod = 'high';
 
   return (
     <div className="flex flex-col lg:flex-row h-full gap-6 w-full relative">
        
        <div 
-          className="relative flex-1 h-[600px] lg:h-full bg-[#F1F5F9] overflow-hidden rounded-[32px] border border-white shadow-inner group outline-none"
+          className={`relative flex-1 h-[600px] lg:h-full overflow-hidden rounded-[32px] border border-white shadow-inner group outline-none transition-colors duration-700 ${mapMode === 'heatmap' ? 'bg-[#0f172a]' : 'bg-[#F1F5F9]'}`}
           ref={mapContainerRef}
           onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
        >
@@ -623,10 +812,8 @@ const OfficeMap: React.FC<OfficeMapProps> = ({ businesses, favorites, onToggleFa
                                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">{t('connectionsMode')}</label>
                             </div>
                             <div className="grid grid-cols-2 gap-2 text-[10px] font-bold text-slate-500">
-                                <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-600"></span> Tech</div>
-                                <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-purple-600"></span> Eng</div>
-                                <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-600"></span> Transport</div>
-                                <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-pink-600"></span> Edu</div>
+                                <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-600"></span> Industry</div>
+                                <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500"></span> Synergy</div>
                             </div>
                         </div>
                    )}
@@ -668,7 +855,119 @@ const OfficeMap: React.FC<OfficeMapProps> = ({ businesses, favorites, onToggleFa
                     
                     {/* Map Base */}
                     <div className="absolute inset-0 bg-white rounded-3xl shadow-[0_50px_100px_-20px_rgba(0,0,0,0.1)] border-4 border-white/50"></div>
-                    <DataGrid />
+                    
+                    {/* DataGrid Layer with Dynamic MapMode Visuals & LOD */}
+                    <DataGrid mapMode={mapMode} businesses={businesses} lod={currentLod} />
+
+                    {/* Networking Lines Layer */}
+                    {mapMode === 'networking' && (
+                       <div className="absolute inset-0 pointer-events-none preserve-3d" style={{ transform: 'translateZ(5px)' }}>
+                          <svg className="w-full h-full overflow-visible">
+                             <defs>
+                                <linearGradient id="grad-synergy" x1="0%" y1="0%" x2="100%" y2="0%">
+                                   <stop offset="0%" stopColor="#22c55e" stopOpacity="0" />
+                                   <stop offset="50%" stopColor="#22c55e" stopOpacity="1" />
+                                   <stop offset="100%" stopColor="#22c55e" stopOpacity="0" />
+                                </linearGradient>
+                             </defs>
+                             {networkingConnections.map(conn => {
+                                // Interactive Highlight Logic
+                                const isRelated = hoveredId ? conn.participants.includes(hoveredId) : true;
+                                const opacity = hoveredId ? (isRelated ? 1 : 0.1) : 0.6;
+
+                                return (
+                                    <g key={conn.id} className="transition-opacity duration-300" style={{ opacity }}>
+                                       {/* Line */}
+                                       <line 
+                                          x1={conn.start.x} y1={conn.start.y} 
+                                          x2={conn.end.x} y2={conn.end.y} 
+                                          stroke={conn.type === 'synergy' ? '#22c55e' : '#3b82f6'} 
+                                          strokeWidth={conn.type === 'synergy' ? 3 : 1}
+                                          strokeDasharray={conn.type === 'industry' ? "5,5" : "0"}
+                                       />
+                                       {/* Moving Particles for activity */}
+                                       <circle r={3} fill={conn.type === 'synergy' ? '#fff' : '#3b82f6'}>
+                                          <animateMotion 
+                                             dur={conn.type === 'synergy' ? "2s" : "4s"} 
+                                             repeatCount="indefinite"
+                                             path={`M${conn.start.x},${conn.start.y} L${conn.end.x},${conn.end.y}`}
+                                          />
+                                       </circle>
+                                    </g>
+                                );
+                             })}
+                          </svg>
+                       </div>
+                    )}
+
+                    {/* Traffic Flow Layer */}
+                    {mapMode === 'traffic' && (
+                        <div className="absolute inset-0 pointer-events-none preserve-3d" style={{ transform: 'translateZ(2px)' }}>
+                            <svg className="w-full h-full overflow-visible">
+                                <style>{`
+                                    @keyframes dash {
+                                        to { stroke-dashoffset: -30; }
+                                    }
+                                    @keyframes dash-reverse {
+                                        to { stroke-dashoffset: 30; }
+                                    }
+                                `}</style>
+                                {trafficSegments.map(seg => {
+                                    // Scale intensity 0-50 visitors = 0-1
+                                    const intensity = Math.min(seg.visitors / 50, 1);
+                                    let color = '#10b981'; // Green
+                                    let speed = '1.5s'; // Fast
+                                    
+                                    if (intensity > 0.6) {
+                                        color = '#e11d48'; // Red (High Traffic)
+                                        speed = '4s'; // Slow movement for heavy traffic
+                                    } else if (intensity > 0.3) {
+                                        color = '#f59e0b'; // Orange
+                                        speed = '2.5s';
+                                    }
+
+                                    return (
+                                        <g key={seg.id} className="animate-fade-in">
+                                            {/* Base Road */}
+                                            <line 
+                                                x1={seg.x1} y1={seg.y1} x2={seg.x2} y2={seg.y2} 
+                                                stroke="#94a3b8" 
+                                                strokeWidth="24" 
+                                                strokeLinecap="round" 
+                                                opacity="0.15" 
+                                            />
+                                            {/* Moving Dash - simulating cars */}
+                                            <line 
+                                                x1={seg.x1} y1={seg.y1} x2={seg.x2} y2={seg.y2} 
+                                                stroke={color} 
+                                                strokeWidth="6" 
+                                                strokeDasharray="10,20"
+                                                strokeLinecap="round"
+                                                style={{ 
+                                                    animation: `dash ${speed} linear infinite`
+                                                }}
+                                            />
+                                            {/* Opposite Lane */}
+                                            <line 
+                                                x1={seg.x1 + (seg.orientation === 'vertical' ? 8 : 0)} 
+                                                y1={seg.y1 + (seg.orientation === 'horizontal' ? 8 : 0)} 
+                                                x2={seg.x2 + (seg.orientation === 'vertical' ? 8 : 0)} 
+                                                y2={seg.y2 + (seg.orientation === 'horizontal' ? 8 : 0)} 
+                                                stroke={color} 
+                                                strokeWidth="6" 
+                                                strokeDasharray="10,20"
+                                                strokeLinecap="round"
+                                                opacity="0.7"
+                                                style={{ 
+                                                    animation: `dash-reverse ${speed} linear infinite`
+                                                }}
+                                            />
+                                        </g>
+                                    );
+                                })}
+                            </svg>
+                        </div>
+                    )}
 
                     {processedBusinesses.map((business) => {
                         const colIndex = business.gridPosition.x - 1;
